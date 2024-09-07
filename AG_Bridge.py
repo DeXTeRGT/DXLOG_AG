@@ -20,7 +20,7 @@ logger  = getLoggerHandle()
 class Ui(QtWidgets.QMainWindow):
     Radio1Band = 0
     Radio2Band = 0
-
+    BandMap = {}
 
     def __init__(self):
         super(Ui, self).__init__()
@@ -49,6 +49,8 @@ class Ui(QtWidgets.QMainWindow):
         self.Settings.pressed.connect(self.DoSettings)
         self.About.pressed.connect(self.DoAbout)
 
+        logger.info (dict(ReadConfiguration['BAND_SET']))
+        self.BandMap = dict(ReadConfiguration['BAND_SET'])
 
     @pyqtSlot()
     def on_connected(self):
@@ -60,7 +62,7 @@ class Ui(QtWidgets.QMainWindow):
 
     @pyqtSlot(str)
     def on_data_received(self, data):
-        logger.info(data)
+        logger.debug(data)
 
     @pyqtSlot(str)
     def on_error_occurred(self, error_message):
@@ -75,82 +77,39 @@ class Ui(QtWidgets.QMainWindow):
 
     @pyqtSlot(str, QHostAddress, int)
     def on_UDPdata_received(self, data, sender, sender_port):
-        #message = f"Received '{data}' from {sender.toString()}:{sender_port}\n"
-        #logger.info("Got XML from DXLog")
         self.UpdateUDP (data)
-        #self.text_edit.append(message)  # Append the received message to the text edit
+
+
+
+
+    def DXLogMakeTCP_payload(self, UdpDataDict):
+
+        if (UdpDataDict['RadioInfo']['RadioNr'] == '1'):
+            if (self.Radio1Band != self.ComputeBandNumber(int(UdpDataDict['RadioInfo']['Freq']))):
+                logger.info ("Band: " + str(self.ComputeBandNumber(int(UdpDataDict['RadioInfo']['Freq']))) + " For Radio: " + UdpDataDict['RadioInfo']['RadioNr'] )
+                self.Radio1Band = self.ComputeBandNumber(int(UdpDataDict['RadioInfo']['Freq']))
+                TcpSendCommand = "C22|port set {} source=MANUAL band={}\n".format(UdpDataDict['RadioInfo']['RadioNr'], self.BandMap[str(self.ComputeBandNumber(int(UdpDataDict['RadioInfo']['Freq'])))])
+                logger.debug (TcpSendCommand)
+                self.client.send_data (TcpSendCommand)
+
+        if (UdpDataDict['RadioInfo']['RadioNr'] == '2'):
+            if (self.Radio2Band != self.ComputeBandNumber(int(UdpDataDict['RadioInfo']['Freq']))):
+                logger.info ("Band: " + str(self.ComputeBandNumber(int(UdpDataDict['RadioInfo']['Freq']))) + " For Radio: " + UdpDataDict['RadioInfo']['RadioNr'] )
+                self.Radio2Band = self.ComputeBandNumber(int(UdpDataDict['RadioInfo']['Freq']))
+                TcpSendCommand = "C22|port set {} source=MANUAL band={}\n".format(UdpDataDict['RadioInfo']['RadioNr'], self.BandMap[str(self.ComputeBandNumber(int(UdpDataDict['RadioInfo']['Freq'])))])
+                logger.debug (TcpSendCommand)
+                self.client.send_data(TcpSendCommand)
 
 
 
     def UpdateUDP(self, udp_data):
         data = xmltodict.parse(udp_data)
-        #print(data['RadioInfo']['RadioNr'])
         try:
             if data.get('RadioInfo') is not None:
-                #logger.info ("Received an UDP RadioInfo package from DXLog")
-                #logger.info(data['RadioInfo']['Freq'])
-
-                if (data['RadioInfo']['RadioNr'] == '1'):
-                    if (self.Radio1Band != self.ComputeBandNumber(int(data['RadioInfo']['Freq']))):
-                        logger.info ("Band: " + str(self.ComputeBandNumber(int(data['RadioInfo']['Freq']))) + " For Radio: " + data['RadioInfo']['RadioNr'] )
-                        self.Radio1Band = self.ComputeBandNumber(int(data['RadioInfo']['Freq']))
-
-                        if (self.Radio1Band == 160 ):
-                            pass
-                            self.client.send_data("C22|port set 1 source=MANUAL band=1\n")
-
-                        if (self.Radio1Band == 80 ):
-                            pass
-                            self.client.send_data("C22|port set 1 source=MANUAL band=2\n")
-
-                        if (self.Radio1Band == 40 ):
-                            pass
-                            self.client.send_data("C22|port set 1 source=MANUAL band=3\n")
-
-                        if (self.Radio1Band == 20 ):
-                            pass
-                            self.client.send_data("C22|port set 1 source=MANUAL band=5\n")
-
-                        if (self.Radio1Band == 15 ):
-                            pass
-                            self.client.send_data("C22|port set 1 source=MANUAL band=7\n")
-
-                        if (self.Radio1Band == 10 ):
-                             pass
-                             self.client.send_data("C22|port set 1 source=MANUAL band=9\n")
-
-                if (data['RadioInfo']['RadioNr'] == '2'):
-                    if (self.Radio2Band != self.ComputeBandNumber(int(data['RadioInfo']['Freq']))):
-                        logger.info ("Band: " + str(self.ComputeBandNumber(int(data['RadioInfo']['Freq']))) + " For Radio: " + data['RadioInfo']['RadioNr'] )
-                        self.Radio2Band = self.ComputeBandNumber(int(data['RadioInfo']['Freq']))
-
-                        if (self.Radio2Band == 160 ):
-                            pass
-                            self.client.send_data("C22|port set 2 source=MANUAL band=1\n")
-
-                        if (self.Radio2Band == 80 ):
-                            pass
-                            self.client.send_data("C22|port set 2 source=MANUAL band=2\n")
-
-                        if (self.Radio2Band == 40 ):
-                            pass
-                            self.client.send_data("C22|port set 2 source=MANUAL band=3\n")
-
-                        if (self.Radio2Band == 20 ):
-                            pass
-                            self.client.send_data("C22|port set 2 source=MANUAL band=5\n")
-
-                        if (self.Radio2Band == 15 ):
-                            pass
-                            self.client.send_data("C22|port set 2 source=MANUAL band=7\n")
-
-                        if (self.Radio2Band == 10 ):
-                            pass
-                            self.client.send_data("C22|port set 2 source=MANUAL band=9\n")
-
+                logger.debug("Received DXLog UDP Radio Info \n {}".format(data) )
+                self.DXLogMakeTCP_payload(data)
         except:
-            #logger.critical("Received an unparsable package via UDP - dumping data: " +  data)
-            logger.critical(data)
+            logger.critical("Received an unparsable package via UDP - dumping data: \n {}".format(data))
             pass
 
 
