@@ -127,7 +127,6 @@ class Ui(QtWidgets.QMainWindow):
             band = 15
         if freq in range(2800000,2970000):
             band = 10
-
         return band
 
     
